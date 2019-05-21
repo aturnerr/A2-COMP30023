@@ -25,7 +25,14 @@ int main(int argc, char * argv[]) {
   // printf("%s", result);
   //
   // free(result);
-  generate_guesses(50, 0);
+  if (argc == 1) {
+    generate_guesses(1, 1);
+  }
+  if (argc == 2) {
+    int n = atoi(argv[1]);
+    generate_guesses(n, 0);
+  }
+
 
   return 1;
 }
@@ -67,9 +74,14 @@ void generate_guesses(int max_passwords, int compare_hash) {
   strcpy(charset['s'- ASCII], "$z");
   strcpy(charset['z'- ASCII], "2");
 
-  while (fscanf(read_fp, "%s", word) == 1) {
-    printf("%s\n", word);
-    num_generated++;
+
+  while ((fscanf(read_fp, "%s", word) == 1) && (num_generated < max_passwords)) {
+    if (compare_hash == 0) {
+      printf("%s\n", word);
+      num_generated++;
+    } else {
+      printf("%s\n", word);
+    }
 
     for (i = 0; i < strlen(word); i++) {
       if (isalpha(word[i])) {
@@ -77,8 +89,12 @@ void generate_guesses(int max_passwords, int compare_hash) {
           for (j = 0; j < strlen(charset[word[i] - ASCII]); j++) {
             strcpy(word_buffer, word);
             word_buffer[i] = charset[word[i] - ASCII][j];
-            printf("%s\n", word_buffer);
-            num_generated++;
+            if ((num_generated < max_passwords) && compare_hash == 0) {
+              printf("%s\n", word_buffer);
+              num_generated++;
+            } else if (compare_hash == 1) {
+              printf("%s\n", word_buffer);
+            }
           }
         }
       }
