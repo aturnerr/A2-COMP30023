@@ -4,7 +4,7 @@
 #include "sha256.h"
 #include "ctype.h"
 
-// hex output command: xxd -p -l 32 output
+// hex output command: xxd -p -c 32 output
 #define MAX_WORD_LEN 6
 #define ASCII 97
 #define MAX_NUMBER 999999
@@ -22,30 +22,41 @@ BYTE *sha256(const char *string) {
   return result;
 }
 
+void sha256_byteToHexString(BYTE data[], char output[]) {
+	char *hexC = "0123456789abcdef";
+	char *hexS = malloc(65);
+	for(BYTE i; i<32; i++) {
+		hexS[i*2]   = hexC[data[i]>>4];
+		hexS[i*2+1] = hexC[data[i]&0xF];
+	}
+	hexS[64] = 0;
+  strcpy(output, hexS);
+}
+
 void compare_lists(char wordlist[], char hashlist[]) {
   FILE *word_file = fopen(wordlist, "r");
   if (word_file == NULL) { perror("INVALID PASSWORD LIST"); return; }
-  FILE *hash_file = fopen(hashlist, "r");
-  if (hash_file == NULL) { perror("INVALID HASH LIST"); return; }
+  // FILE *hash_file = fopen(hashlist, "r");
+  // if (hash_file == NULL) { perror("INVALID HASH LIST"); return; }
 
-  fseek(word_file, 0L, SEEK_END);
-  int word_file_size = ftell(word_file);
-  fseek(word_file, 0L, SEEK_SET);
+  char line [256];
 
-  fseek(hash_file, 0L, SEEK_END);
-  int hash_file_size = ftell(hash_file);
-  fseek(hash_file, 0L, SEEK_SET);
+  while (fscanf(word_file, "%s", line) == 1) {
+    SHA256_CTX ctx;
+    BYTE result[SHA256_BLOCK_SIZE];
+    sha256_init(&ctx);
+    sha256_update(&ctx, (const BYTE *)line, strlen(line));
+    sha256_final(&ctx, result);
+    char hex_result[SHA256_BLOCK_SIZE*2+1];
+    sha256_byteToHexString(result, hex_result);
 
-  unsigned char buffer[33];
-
-  for (int i=0; i < word_file_size; i += 32) {
-    fread(buffer, 1, 32, word_file);
-    printf("%s\n", buffer);
+    printf("%s\n", hex_result);
   }
 
 
+
   fclose(word_file);
-  fclose(hash_file);
+  // fclose(hash_file);
 }
 
 int main(int argc, char * argv[]) {
