@@ -36,8 +36,24 @@ void sha256_byteToHexString(BYTE data[], char output[]) {
 void compare_lists(char wordlist[], char hashlist[]) {
   FILE *word_file = fopen(wordlist, "r");
   if (word_file == NULL) { perror("INVALID PASSWORD LIST"); return; }
-  // FILE *hash_file = fopen(hashlist, "r");
-  // if (hash_file == NULL) { perror("INVALID HASH LIST"); return; }
+  FILE *hash_file = fopen(hashlist, "r");
+  if (hash_file == NULL) { perror("INVALID HASH LIST"); return; }
+  fseek(hash_file, 0L, SEEK_END);
+  int hash_file_size = ftell(hash_file);
+  fseek(hash_file, 0L, SEEK_SET);
+
+  int n_hashes = hash_file_size / SHA256_BLOCK_SIZE;
+  char hashes[n_hashes][SHA256_BLOCK_SIZE*2+1];
+  unsigned char buffer[33];
+  char hex_buffer[SHA256_BLOCK_SIZE*2+1];
+
+  for (int i = 0; i < hash_file_size; i+=SHA256_BLOCK_SIZE) {
+    fread(buffer, 1, 32, hash_file);
+    buffer[32]='\0';
+    sha256_byteToHexString(buffer, hex_buffer);
+    strcpy(hashes[i/SHA256_BLOCK_SIZE], hex_buffer);
+    // printf("%s\n", hex_buffer);
+  }
 
   char line [256];
 
@@ -50,7 +66,12 @@ void compare_lists(char wordlist[], char hashlist[]) {
     char hex_result[SHA256_BLOCK_SIZE*2+1];
     sha256_byteToHexString(result, hex_result);
 
-    printf("%s\n", hex_result);
+    for (int i = 0; i < n_hashes; i++) {
+      if (strcmp(hashes[i], hex_result) == 0) {
+        printf("%s %d\n", line, i+1);
+      }
+    }
+    // printf("%s\n", hex_result);
   }
 
 
