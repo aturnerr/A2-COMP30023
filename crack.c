@@ -11,7 +11,7 @@
 
 static char const * const PWD_FORMAT = "%s %d\n";
 
-void generate_guesses(int max_passwords, int compare_hash);
+void generate_guesses(long long int max_passwords, int compare_hash);
 
 BYTE *sha256(const char *string) {
   SHA256_CTX ctx;
@@ -52,7 +52,6 @@ void compare_lists(char wordlist[], char hashlist[]) {
     buffer[32]='\0';
     sha256_byteToHexString(buffer, hex_buffer);
     strcpy(hashes[i/SHA256_BLOCK_SIZE], hex_buffer);
-    // printf("%s\n", hex_buffer);
   }
 
   char line [256];
@@ -77,7 +76,7 @@ void compare_lists(char wordlist[], char hashlist[]) {
 
 
   fclose(word_file);
-  // fclose(hash_file);
+  fclose(hash_file);
 }
 
 int main(int argc, char * argv[]) {
@@ -90,7 +89,7 @@ int main(int argc, char * argv[]) {
     generate_guesses(1, 1);
   }
   if (argc == 2) {
-    int n = atoi(argv[1]);
+    long long int n = atoll(argv[1]);
     generate_guesses(n, 0);
   }
   if (argc == 3) {
@@ -229,7 +228,7 @@ void mutate_case(char word[MAX_WORD_LEN+1], char found_passwords[], int *num_gen
   }
 }
 
-void append_characters(char word[MAX_WORD_LEN+1], char found_passwords[], int *num_generated, int max_passwords, int compare_hash, int num_to_append) {
+void append_characters(char word[MAX_WORD_LEN+1], char found_passwords[], int *num_generated, long long int max_passwords, int compare_hash, int num_to_append) {
   int i = 0;
   char word_buffer[MAX_WORD_LEN+1];
   char charset[] = "1234567890!* ";
@@ -252,7 +251,7 @@ void append_characters(char word[MAX_WORD_LEN+1], char found_passwords[], int *n
   }
 }
 
-void generate_numbers(char found_passwords[], int *num_generated, int max_passwords, int compare_hash, int length) {
+void generate_numbers(char found_passwords[], int *num_generated, long long int max_passwords, int compare_hash, int length) {
   int count = 100000;
   char num[6];
   while ((count < MAX_NUMBER+1) ) {
@@ -269,15 +268,15 @@ void generate_numbers(char found_passwords[], int *num_generated, int max_passwo
   }
 }
 
-void bruteforce_char(char found_passwords[], int *num_generated, int max_passwords, int compare_hash) {
+void bruteforce_char(char found_passwords[], int *num_generated, long long int max_passwords, int compare_hash) {
   char brute[7] = "aaaaaa\0";
 
-  for (brute[0] = '!'; brute[0] <= '}'; brute[0] ++) {
-    for (brute[1] = '!'; brute[1] <= '}'; brute[1] ++) {
-      for (brute[2] = '!'; brute[2] <= '}'; brute[2] ++) {
-        for (brute[3] = '!'; brute[3] <= '}'; brute[3] ++) {
-          for (brute[4] = '!'; brute[4] <= '}'; brute[4] ++) {
-            for (brute[5] = '!'; brute[5] <= '}'; brute[5] ++) {
+  for (brute[0] = ' '; brute[0] <= '~'; brute[0] ++) {
+    for (brute[1] = ' '; brute[1] <= '~'; brute[1] ++) {
+      for (brute[2] = ' '; brute[2] <= '~'; brute[2] ++) {
+        for (brute[3] = ' '; brute[3] <= '~'; brute[3] ++) {
+          for (brute[4] = ' '; brute[4] <= '~'; brute[4] ++) {
+            for (brute[5] = ' '; brute[5] <= '~'; brute[5] ++) {
               if ((*num_generated < max_passwords) && compare_hash == 0) {
                 printf("%s\n", brute);
                 (*num_generated)++;
@@ -294,8 +293,8 @@ void bruteforce_char(char found_passwords[], int *num_generated, int max_passwor
   }
 }
 
-void generate_guesses(int max_passwords, int compare_hash) {
-  FILE* read_fp = fopen("password_list_6.txt", "r");
+void generate_guesses(long long int max_passwords, int compare_hash) {
+  FILE* read_fp = fopen("list.txt", "r");
   FILE *potfile = fopen("potfile", "w");
 
   char charset[26][10] = {{ 0 }};
@@ -325,19 +324,19 @@ void generate_guesses(int max_passwords, int compare_hash) {
   while ((fscanf(read_fp, "%s", word) == 1) && (num_generated < max_passwords)) {
     mutate_basic(word, found_passwords, &num_generated, max_passwords, compare_hash);
     if (strlen(word) == 6) {
-      mutate_characters(word, found_passwords, charset, &num_generated, max_passwords, compare_hash, 2);
-      mutate_case(word, found_passwords, &num_generated, max_passwords, compare_hash, 2);
-    // } else if (strlen(word) == 5) {
-    //   append_characters(word, found_passwords, &num_generated, max_passwords, compare_hash, 1);
-    // } else if (strlen(word) == 4) {
-    //   append_characters(word, found_passwords, &num_generated, max_passwords, compare_hash, 2);
+      mutate_characters(word, found_passwords, charset, &num_generated, max_passwords, compare_hash, 1);
+      mutate_case(word, found_passwords, &num_generated, max_passwords, compare_hash, 1);
+  //   // } else if (strlen(word) == 5) {
+  //   //   append_characters(word, found_passwords, &num_generated, max_passwords, compare_hash, 1);
+  //   // } else if (strlen(word) == 4) {
+  //   //   append_characters(word, found_passwords, &num_generated, max_passwords, compare_hash, 2);
     }
   }
-  generate_numbers(found_passwords, &num_generated, max_passwords, compare_hash, 6);
-  bruteforce_char(found_passwords, &num_generated, max_passwords, compare_hash);
+  // generate_numbers(found_passwords, &num_generated, max_passwords, compare_hash, 6);
+  // bruteforce_char(found_passwords, &num_generated, max_passwords, compare_hash);
 
   // printf("Done generating!\n");
-  // fprintf(potfile, "%s", found_passwords);
+  fprintf(potfile, "%s", found_passwords);
   fclose(potfile);
   fclose(read_fp);
 }
