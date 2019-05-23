@@ -97,7 +97,7 @@ int main(int argc, char * argv[]) {
   }
 
 
-  return 1;
+  return 0;
 }
 
 char *check_replace_char_multiple(char * word, int i, char letter, char replacement) {
