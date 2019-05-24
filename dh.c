@@ -1,3 +1,11 @@
+/*
+	DiffieHellman exchange script for Assignment 2 of COMP30023
+  Written by Adam Turner, May 2019
+
+	Compute function:
+	https://www.techiedelight.com/c-program-demonstrate-diffie-hellman-algorithm/
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,13 +45,6 @@ int main(int argc, char * argv[]) {
   struct sockaddr_in serv_addr;
 
   char buffer[256];
-
-  // if (argc < 3) {
-  //   fprintf(stderr, "usage %s hostname port\n", argv[0]);
-  //   exit(EXIT_FAILURE);
-  // }
-
-  // portno = atoi(argv[2]);
   portno = 7800;
 
   bzero((char *)&serv_addr, sizeof(serv_addr));
@@ -63,14 +64,9 @@ int main(int argc, char * argv[]) {
     perror("ERROR connecting");
     exit(EXIT_FAILURE);
   }
-  // scp -i ~/.ssh/key DiffieHellman.c aturner2@172.26.37.44:dh.c
-	// echo -n dh.c | sha256sum
 
   int g = 15, b = 0, p = 97;
 
-	// get username
-	// printf("Username: ");
-	// fgets(buffer, 255, stdin);
 	strcpy(buffer, "aturner2\n");
 
 	// send username
@@ -81,15 +77,17 @@ int main(int argc, char * argv[]) {
 	}
 
 	// get b
-  printf("Enter secret: ");
+  // printf("Enter secret: ");
   scanf("%d", &b);
-	printf("Secret b = %d\n", b);
+	// printf("Secret b = %d\n", b);
 
 	// calculate g^b(mod p)
-  int gb = compute(g, b, p);
+  int gbmodp = compute(g, b, p);
+
 	// convert to string
-  sprintf(buffer, "%d\n", gb);
-	printf("Current buffer: %d\n", gb);
+  sprintf(buffer, "%d\n", gbmodp);
+	// printf("Current buffer: %d\n", gbmodp);
+
 	// send to server
   n = write(sockfd, buffer, strlen(buffer));
   if (n < 0) {
@@ -104,40 +102,43 @@ int main(int argc, char * argv[]) {
     exit(EXIT_FAILURE);
   }
 
-	printf("Received: %s", buffer);
+	// printf("Received: %s", buffer);
 
-	// // convert response to int
+	// convert response to int
 	int gamodp = 0;
 	for (int i=0; buffer[i]!='\n'; i++) {
 	    gamodp *= 10;
 	    gamodp += buffer[i] - '0';
 	}
+
 	// less reliable (seems to result in non valid integer response?)
 	// buffer[n] = 0;
 	// int gamodp = atoi(buffer);
 
-  printf("Converted to: %d\n", gamodp);
+  // printf("Converted to: %d\n", gamodp);
 
+	// calculate secret
   int s = compute(gamodp, b, p);
-	printf("A^b(mod p) = %d\n", s);
+	// printf("A^b(mod p) = %d\n", s);
   sprintf(buffer, "%d\n", s);
-	printf("Current buffer: %s", buffer);
+	// printf("Current buffer: %s", buffer);
 
+	// send secret
   n = write(sockfd, buffer, strlen(buffer));
   if (n < 0) {
     perror("ERROR writing to socket");
     exit(EXIT_FAILURE);
   }
 
+	// receive confirmation
 	n = read(sockfd, buffer, 255);
   if (n < 0) {
     perror("ERROR reading from socket");
     exit(EXIT_FAILURE);
   }
-  printf("Received: %s\n", buffer);
+  printf("%s", buffer);
 
 
-
-  return 0;
 	close(sockfd);
+  return 0;
 }
