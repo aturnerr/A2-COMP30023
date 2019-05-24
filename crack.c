@@ -1,61 +1,94 @@
+/*
+ * Dictionary mangler and bruteforce hash cracker for Assignment 2 of COMP30023
+ * Written by Adam Turner, May 2019
+ *
+ * sha256_byteToHexString function:
+ * https://github.com/RemyNoulin/sha256
+ *
+ * strcmp_unsigned function:
+ * https://stackoverflow.com/questions/1356741/
+*/
+
 #include <stdio.h>
 #include <string.h>
 #include "stdlib.h"
 #include "sha256.h"
 #include "ctype.h"
 
-// hex output command: xxd -p -c 32 output
-#define MAX_WORD_LEN 6
+// constants
+#define ALPHA_COUNT 26
 #define ASCII 97
-#define MAX_NUMBER 999999
+#define BRUTEFORCE_NUM_START 100000
+#define BRUTEFORCE_NUM_END 999999
+
+#define MAX_WORD_LEN 6
+#define MAX_SUBSTITUTIONS 10
+#define MAX_POTFILE_LINE_LENGTH 10
+#define MAX_PASSWORD_LINE_LENGTH 10000
+#define MAX_FOUND_SIZE 10000
+
+#define DICTIONARY "list.txt"
+#define HASH_FILE "pwd6sha256"
+#define POTFILE "potfile"
 
 static char const * const PWD_FORMAT = "%s %d\n";
 
-void generate_guesses(long long int max_passwords, int compare_hash);
-
+/*
+ * Generate the SHA256 sum of a given string and return result array
+*/
 BYTE *sha256(const char *string) {
   SHA256_CTX ctx;
   sha256_init(&ctx);
   sha256_update(&ctx, (const BYTE *)string, strlen(string));
-  BYTE *result = (BYTE *) malloc(sizeof(BYTE) * 32);
+  BYTE *result = (BYTE *) malloc(sizeof(BYTE) * SHA256_BLOCK_SIZE);
   sha256_final(&ctx, result);
   return result;
 }
 
+/*
+ * Convert unsigned char (BYTE) array to hexidecimal
+*/
 void sha256_byteToHexString(BYTE data[], char output[]) {
 	char *hexC = "0123456789abcdef";
-	char *hexS = malloc(65);
-	for(BYTE i; i<32; i++) {
+	char *hexS = malloc(SHA256_BLOCK_SIZE*2+1);
+	for(BYTE i; i<SHA256_BLOCK_SIZE; i++) {
 		hexS[i*2]   = hexC[data[i]>>4];
 		hexS[i*2+1] = hexC[data[i]&0xF];
 	}
-	hexS[64] = 0;
+	hexS[SHA256_BLOCK_SIZE*2] = 0;
   strcpy(output, hexS);
 }
 
+/*
+ * Hash and compare a supplied wordlist against a list of SHA256 hashes
+*/
 void compare_lists(char wordlist[], char hashlist[]) {
+  // open files
   FILE *word_file = fopen(wordlist, "r");
   if (word_file == NULL) { perror("INVALID PASSWORD LIST"); return; }
   FILE *hash_file = fopen(hashlist, "r");
   if (hash_file == NULL) { perror("INVALID HASH LIST"); return; }
+  // get size of hash file
   fseek(hash_file, 0L, SEEK_END);
   int hash_file_size = ftell(hash_file);
   fseek(hash_file, 0L, SEEK_SET);
-
+  // calculate number of hashes
   int n_hashes = hash_file_size / SHA256_BLOCK_SIZE;
+  // initialise arrays
   char hashes[n_hashes][SHA256_BLOCK_SIZE*2+1];
-  unsigned char buffer[33];
+  unsigned char buffer[SHA256_BLOCK_SIZE+1];
   char hex_buffer[SHA256_BLOCK_SIZE*2+1];
+  char line [MAX_PASSWORD_LINE_LENGTH];
 
+  // convert hashes to hex and store in array
   for (int i = 0; i < hash_file_size; i+=SHA256_BLOCK_SIZE) {
-    fread(buffer, 1, 32, hash_file);
-    buffer[32]='\0';
+    fread(buffer, 1, SHA256_BLOCK_SIZE, hash_file);
+    buffer[SHA256_BLOCK_SIZE]='\0';
     sha256_byteToHexString(buffer, hex_buffer);
     strcpy(hashes[i/SHA256_BLOCK_SIZE], hex_buffer);
   }
 
-  char line [256];
-
+  // hash, convert to hex then compare every word against the hashes
   while (fscanf(word_file, "%s", line) == 1) {
     SHA256_CTX ctx;
     BYTE result[SHA256_BLOCK_SIZE];
@@ -70,53 +103,15 @@ void compare_lists(char wordlist[], char hashlist[]) {
         printf("%s %d\n", line, i+1);
       }
     }
-    // printf("%s\n", hex_result);
   }
-
-
-
+  // close files
   fclose(word_file);
   fclose(hash_file);
 }
 
-int main(int argc, char * argv[]) {
-  // char *word = argv[1];
-  // BYTE *result = sha256(word);
-  // printf("%s", result);
-  //
-  // free(result);
-  if (argc == 1) {
-    generate_guesses(1, 1);
-  }
-  if (argc == 2) {
-    long long int n = atoll(argv[1]);
-    generate_guesses(n, 0);
-  }
-  if (argc == 3) {
-    compare_lists(argv[1], argv[2]);
-  }
-
-
-  return 0;
-}
-
-char *check_replace_char_multiple(char * word, int i, char letter, char replacement) {
-  if ((word[i] == letter) || (word[i] == toupper(letter))) {
-    word[i] = replacement;
-    printf("%s\n", word);
-  }
-  return word;
-}
-
-void check_replace_char(char word[MAX_WORD_LEN+1], int i, char letter, char replacement) {
-  char word_buffer[MAX_WORD_LEN+1];
-  if ((word[i] == letter) || (word[i] == toupper(letter))) {
-    strcpy(word_buffer, word);
-    word_buffer[i] = replacement;
-    printf("%s\n", word_buffer);
-  }
-}
-
+/*
+ * Reimplementation of strcmp for unsigned char (BYTE)
+*/
 int strcmp_unsigned(BYTE *s1, BYTE *s2) {
   unsigned char * p1 = (unsigned char *)s1;
   unsigned char * p2 = (unsigned char *)s2;
@@ -129,49 +124,60 @@ int strcmp_unsigned(BYTE *s1, BYTE *s2) {
   return ( *p1 - *p2 );
 }
 
+/*
+ * Hash and compare a word against a list of SHA256 hashes
+*/
 int check_hash(char word[MAX_WORD_LEN+1], char *found_passwords) {
-  FILE *fp = fopen("pwd6sha256", "r");
-
-  BYTE *result = sha256(word);
-  unsigned char buffer[33];
-  char pwd_buffer[10];
-
+  FILE *fp = fopen(HASH_FILE, "r");
+  unsigned char buffer[SHA256_BLOCK_SIZE+1];
+  char pwd_buffer[MAX_POTFILE_LINE_LENGTH];
+  // check if password is already found
   char *already_found = strstr(found_passwords, word);
+  // hash the word
+  BYTE *result = sha256(word);
+
+  // get size of hash file
+  fseek(fp, 0, SEEK_END);
+  long fsize = ftell(fp);
+  fseek(fp, 0, SEEK_SET);
 
   if (!already_found) {
-    for (int i=0; i < 640; i += 32) {
-      fread(buffer, 1, 32, fp);
+    // compare against hashes in file
+    for (int i = 0; i < fsize; i += SHA256_BLOCK_SIZE) {
+      fread(buffer, 1, SHA256_BLOCK_SIZE, fp);
       if (strcmp_unsigned(buffer, result) == 0) {
-          printf("%s %d\n", word, i/32 + 1);
-          sprintf(pwd_buffer, PWD_FORMAT, word, i/32 + 1);
+          printf("%s %d\n", word, i/SHA256_BLOCK_SIZE + 1);
+          sprintf(pwd_buffer, PWD_FORMAT, word, i/SHA256_BLOCK_SIZE + 1);
           strcat(found_passwords, pwd_buffer);
       }
     }
   }
-
+  // free and close
   free(result);
   fclose(fp);
-
   return 1;
 }
 
+/*
+ * Basic character mutation, check the original word and uppercase
+*/
 void mutate_basic(char word[MAX_WORD_LEN+1], char found_passwords[], int *num_generated, int max_passwords, int compare_hash) {
   int i = 0;
   char word_buffer[MAX_WORD_LEN+1];
 
   strcpy(word_buffer, word);
-
+  // check regular word
   if ((*num_generated < max_passwords) && (compare_hash == 0)) {
     printf("%s\n", word_buffer);
     (*num_generated)++;
   } else if (compare_hash == 1) {
     check_hash(word_buffer, found_passwords);
   }
-
+  // convert to uppercase
   for (i = 0; i < strlen(word); i++) {
     word_buffer[i] = toupper(word_buffer[i]);
   }
-
+  // check the word again
   if ((*num_generated < max_passwords) && (compare_hash == 0)) {
     printf("%s\n", word_buffer);
     (*num_generated)++;
@@ -180,17 +186,25 @@ void mutate_basic(char word[MAX_WORD_LEN+1], char found_passwords[], int *num_ge
   }
 }
 
+/*
+ * Mutate characters in a word with a list of substitutions
+*/
 void mutate_characters(char word[MAX_WORD_LEN+1], char found_passwords[], char charset[26][10], int *num_generated, int max_passwords, int compare_hash, int depth) {
   int i = 0, j = 0;
   char word_buffer[MAX_WORD_LEN+1];
 
+  // terminal test
   if (depth > 0) {
     for (i = 0; i < strlen(word); i++) {
+      // make sure character is alphabetic
       if (isalpha(word[i])) {
+        // if substitution exists
         if (charset[tolower(word[i]) - ASCII] != 0) {
           for (j = 0; j < strlen(charset[tolower(word[i]) - ASCII]); j++) {
             strcpy(word_buffer, word);
+            // replace the character
             word_buffer[i] = charset[tolower(word[i]) - ASCII][j];
+            // output or compare hash
             if ((*num_generated < max_passwords) && compare_hash == 0) {
               printf("%s\n", word_buffer);
               (*num_generated)++;
@@ -206,15 +220,21 @@ void mutate_characters(char word[MAX_WORD_LEN+1], char found_passwords[], char c
   }
 }
 
+/*
+ * Mutate lower case characters in a word
+*/
 void mutate_case(char word[MAX_WORD_LEN+1], char found_passwords[], int *num_generated, int max_passwords, int compare_hash, int depth) {
   int i = 0;
   char word_buffer[MAX_WORD_LEN+1];
 
+  // terminal test
   if (depth > 0) {
     for (i = 0; i < strlen(word); i++) {
       strcpy(word_buffer, word);
+      // if lowercase, convert to upper
       if (islower(word_buffer[i])) {
         word_buffer[i] = toupper(word_buffer[i]);
+        // output or compare hash
         if ((*num_generated < max_passwords) && compare_hash == 0) {
           printf("%s\n", word_buffer);
           (*num_generated)++;
@@ -228,17 +248,23 @@ void mutate_case(char word[MAX_WORD_LEN+1], char found_passwords[], int *num_gen
   }
 }
 
+/*
+ * Append characters to the end of smaller words
+*/
 void append_characters(char word[MAX_WORD_LEN+1], char found_passwords[], int *num_generated, long long int max_passwords, int compare_hash, int num_to_append) {
   int i = 0;
   char word_buffer[MAX_WORD_LEN+1];
+  // list of characters to append
   char charset[] = "1234567890!* ";
 
   if (num_to_append > 0) {
     for (i = 0; i < strlen(charset); i++) {
       strcpy(word_buffer, word);
       size_t len = strlen(word_buffer);
+      // increase size of buffer to make space for char
       word_buffer[len++] = charset[i];
       word_buffer[len] = '\0';
+      // output or compare hash
       if ((*num_generated < max_passwords) && compare_hash == 0) {
         printf("%s\n", word_buffer);
         (*num_generated)++;
@@ -251,10 +277,14 @@ void append_characters(char word[MAX_WORD_LEN+1], char found_passwords[], int *n
   }
 }
 
+/*
+ * Generate numbers for a set length
+*/
 void generate_numbers(char found_passwords[], int *num_generated, long long int max_passwords, int compare_hash, int length) {
-  int count = 100000;
-  char num[6];
-  while ((count < MAX_NUMBER+1) ) {
+  int count = BRUTEFORCE_NUM_START;
+  char num[MAX_WORD_LEN];
+  while ((count < BRUTEFORCE_NUM_END+1) ) {
+    // output or compare hash
     if ((*num_generated < max_passwords) && compare_hash == 0) {
       printf("%d\n", count);
       count++;
@@ -268,9 +298,12 @@ void generate_numbers(char found_passwords[], int *num_generated, long long int 
   }
 }
 
+/*
+ * Last-resort nested bruteforce for all 6 character combinations
+*/
 void bruteforce_char(char found_passwords[], int *num_generated, long long int max_passwords, int compare_hash) {
   char brute[7] = "aaaaaa\0";
-
+  // iterate over ascii values of char range
   for (brute[0] = ' '; brute[0] <= '~'; brute[0] ++) {
     for (brute[1] = ' '; brute[1] <= '~'; brute[1] ++) {
       for (brute[2] = ' '; brute[2] <= '~'; brute[2] ++) {
@@ -293,19 +326,25 @@ void bruteforce_char(char found_passwords[], int *num_generated, long long int m
   }
 }
 
+/*
+ * Generate n (max_passwords) guesses of passwords, hash if required
+*/
 void generate_guesses(long long int max_passwords, int compare_hash) {
-  FILE* read_fp = fopen("list.txt", "r");
-  FILE *potfile = fopen("potfile", "w");
+  // open the password list to read
+  FILE *read_fp = fopen(DICTIONARY, "r");
+  // potfile to store found passwords
+  FILE *potfile = fopen(POTFILE, "w");
 
-  char charset[26][10] = {{ 0 }};
+  char charset[ALPHA_COUNT][MAX_SUBSTITUTIONS] = {{ 0 }};
   char word[MAX_WORD_LEN+1];
   int num_generated = 0;
 
+  // get size of potfile
   fseek(potfile, 0, SEEK_END);
   long fsize = ftell(potfile);
   fseek(potfile, 0, SEEK_SET);
 
-  char found_passwords[500];
+  char found_passwords[MAX_FOUND_SIZE];
   fread(found_passwords, 1, fsize, potfile);
 
   // place substitutions in array
@@ -321,22 +360,42 @@ void generate_guesses(long long int max_passwords, int compare_hash) {
   strcpy(charset['s'- ASCII], "$z5");
   strcpy(charset['z'- ASCII], "2");
 
+  // for every word, check basic, mutate basic and case
   while ((fscanf(read_fp, "%s", word) == 1) && (num_generated < max_passwords)) {
     mutate_basic(word, found_passwords, &num_generated, max_passwords, compare_hash);
-    if (strlen(word) == 6) {
+    if (strlen(word) == MAX_WORD_LEN) {
       mutate_characters(word, found_passwords, charset, &num_generated, max_passwords, compare_hash, 1);
       mutate_case(word, found_passwords, &num_generated, max_passwords, compare_hash, 1);
-  //   // } else if (strlen(word) == 5) {
-  //   //   append_characters(word, found_passwords, &num_generated, max_passwords, compare_hash, 1);
-  //   // } else if (strlen(word) == 4) {
-  //   //   append_characters(word, found_passwords, &num_generated, max_passwords, compare_hash, 2);
+    // use below when password list has words less than 6 chars
+    // } else if (strlen(word) == 5) {
+    //   append_characters(word, found_passwords, &num_generated, max_passwords, compare_hash, 1);
+    // } else if (strlen(word) == 4) {
+    //   append_characters(word, found_passwords, &num_generated, max_passwords, compare_hash, 2);
     }
   }
-  // generate_numbers(found_passwords, &num_generated, max_passwords, compare_hash, 6);
-  // bruteforce_char(found_passwords, &num_generated, max_passwords, compare_hash);
+  // run final bruteforce
+  generate_numbers(found_passwords, &num_generated, max_passwords, compare_hash, 6);
+  bruteforce_char(found_passwords, &num_generated, max_passwords, compare_hash);
 
-  // printf("Done generating!\n");
+  // save potfile and close
   fprintf(potfile, "%s", found_passwords);
   fclose(potfile);
   fclose(read_fp);
+}
+
+/*
+ * Main controller for behaviour depending on argc as required
+*/
+int main(int argc, char * argv[]) {
+  if (argc == 1) {
+    generate_guesses(1, 1);
+  }
+  if (argc == 2) {
+    long long int n = atoll(argv[1]);
+    generate_guesses(n, 0);
+  }
+  if (argc == 3) {
+    compare_lists(argv[1], argv[2]);
+  }
+  return 0;
 }
