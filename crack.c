@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 #include "stdlib.h"
 #include "sha256.h"
 #include "ctype.h"
@@ -75,6 +76,8 @@ void compare_lists(char wordlist[], char hashlist[]) {
   fseek(hash_file, 0L, SEEK_END);
   int hash_file_size = ftell(hash_file);
   fseek(hash_file, 0L, SEEK_SET);
+  // make sure that the hash file is valid
+  assert(hash_file_size % 32 == 0);
   // calculate number of hashes
   int n_hashes = hash_file_size / SHA256_BLOCK_SIZE;
   // initialise arrays
@@ -90,7 +93,6 @@ void compare_lists(char wordlist[], char hashlist[]) {
     sha256_byteToHexString(buffer, hex_buffer);
     strcpy(hashes[i/SHA256_BLOCK_SIZE], hex_buffer);
   }
-
   // hash, convert to hex then compare every word against the hashes
   while (fscanf(word_file, "%s", line) == 1) {
     SHA256_CTX ctx;
