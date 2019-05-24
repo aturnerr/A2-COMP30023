@@ -2,6 +2,9 @@
  * Dictionary mangler and bruteforce hash cracker for Assignment 2 of COMP30023
  * Written by Adam Turner, May 2019
  *
+ * dictionary source:
+ * https://github.com/danielmiessler/SecLists
+ *
  * sha256_byteToHexString function:
  * https://github.com/RemyNoulin/sha256
  *
