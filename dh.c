@@ -38,17 +38,18 @@ int main(int argc, char * argv[]) {
 
   char buffer[256];
 
-  if (argc < 3) {
-    fprintf(stderr, "usage %s hostname port\n", argv[0]);
-    exit(EXIT_FAILURE);
-  }
+  // if (argc < 3) {
+  //   fprintf(stderr, "usage %s hostname port\n", argv[0]);
+  //   exit(EXIT_FAILURE);
+  // }
 
-  portno = atoi(argv[2]);
+  // portno = atoi(argv[2]);
+  portno = 7800;
 
   bzero((char *)&serv_addr, sizeof(serv_addr));
   serv_addr.sin_family = AF_INET;
   serv_addr.sin_port = htons(portno);
-  serv_addr.sin_addr.s_addr = inet_addr(argv[1]);
+  serv_addr.sin_addr.s_addr = inet_addr("172.26.37.44");
   sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
   if (sockfd < 0)
@@ -63,11 +64,14 @@ int main(int argc, char * argv[]) {
     exit(EXIT_FAILURE);
   }
   // scp -i ~/.ssh/key DiffieHellman.c aturner2@172.26.37.44:dh.c
+	// echo -n dh.c | sha256sum
+
   int g = 15, b = 0, p = 97;
 
 	// get username
-	printf("Username: ");
-	fgets(buffer, 255, stdin);
+	// printf("Username: ");
+	// fgets(buffer, 255, stdin);
+	strcpy(buffer, "aturner2\n");
 
 	// send username
 	n = write(sockfd, buffer, strlen(buffer));
